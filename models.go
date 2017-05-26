@@ -1,5 +1,6 @@
 package hello
 
+const CUSTOMER_DATASTORE_KIND = "customer"
 
 type Product struct {
 	Id          string

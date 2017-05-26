@@ -7,12 +7,19 @@ import (
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
+	"strconv"
+	"github.com/gorilla/mux"
+)
+
+const (
+	GET_METHOD = "GET"
 )
 
 func init() {
-	http.HandleFunc("/product", productHandler)
-	http.HandleFunc("/customer", customerHandler)
-	http.HandleFunc("/", handler)
+	r := mux.NewRouter()
+	r.Methods(GET_METHOD).Path("/customers").HandlerFunc(GetCustomers)
+	r.HandleFunc("/", handler)
+	http.Handle("/", r)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -34,9 +41,10 @@ func productHandler(w http.ResponseWriter, r *http.Request) {
 
 func customerHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
-
 	case http.MethodPost:
 		AddCustomer(w, r)
+	case http.MethodGet:
+		GetCustomers(w, r)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(fmt.Sprintf("HTTP %s not implemented!", r.Method)))
@@ -55,13 +63,28 @@ func AddCustomer(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	_, storeErr := datastore.Put(ctx, datastore.NewIncompleteKey(ctx, "customer", nil), &customer)
+	datastoreKey, storeErr := datastore.Put(ctx, datastore.NewIncompleteKey(ctx, CUSTOMER_DATASTORE_KIND, nil), &customer)
 	if storeErr != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	b, marshalErr := json.Marshal(&customer)
+	_, marshalErr := json.Marshal(&customer)
+	if marshalErr != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte(strconv.FormatInt(datastoreKey.IntID(), 10)))
+}
+
+func GetCustomers(w http.ResponseWriter, r *http.Request) {
+	customers, err := GetAllCustomers(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	b, marshalErr := json.Marshal(&customers)
 	if marshalErr != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
